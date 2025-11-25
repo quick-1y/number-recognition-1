@@ -72,6 +72,12 @@ curl -X POST http://localhost:8000/api/v1/ingest/channels \
 - API `/api/v1/alarms/relays` и `/api/v1/alarms/relays/{id}/trigger` — управление реле камер и тестовая сработка.
 - Новые переменные окружения: `EVENTS_*`, `WEBHOOK_*`, `ALARM_RELAY_*` (см. `.env.example`).
 
+## Авторизация и API (шаг 8)
+- `app/core/security.py` — генерация/проверка JWT, bcrypt-хэши паролей.
+- `app/api/deps.py` — зависимости FastAPI: получение текущего пользователя, проверка ролей (admin/operator/viewer).
+- `/api/v1/auth/token` (OAuth2 password flow) — получение access token; `/api/v1/auth/me` — сведения о текущем пользователе.
+- Все mutating endpoints (ingest, lists, rules, events, webhooks, relays) требуют ролей `operator` или `admin`, чтение — `viewer` и выше.
+- Пример SQL для создания пользователя в README (секция быстрого старта); используйте bcrypt-хэш пароля.
+
 ## Ближайшие доработки
-- Шаг 7–8: сервис событий, вебхуки, реле и полнофункциональный REST API с авторизацией.
-- Шаг 9: интеграция с фронтендом и ролевой моделью (RBAC).
+- Шаг 9: интеграция с фронтендом и UI для RBAC/аудита.

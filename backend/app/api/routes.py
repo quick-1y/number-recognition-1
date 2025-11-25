@@ -1,7 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.security import create_access_token, verify_password
+from app.api.deps import get_db, require_role
+from app.db.models import User, UserRole
 from app.events import alarm_relay_controller, event_manager, webhook_service
 from app.pipeline import (
     ChannelConfig,
@@ -61,12 +66,29 @@ def modules() -> dict[str, list[str]]:
     }
 
 
-@router.get("/pipeline/status", summary="Конфигурация детектора, трекера, OCR и постобработки")
-def pipeline_status() -> dict:
+@router.get(
+    "/pipeline/status",
+    summary="Конфигурация детектора, трекера, OCR и постобработки",
+)
+def pipeline_status(current_user: User = Depends(require_role(UserRole.viewer))) -> dict:
     return {
         **recognition_pipeline.describe(),
         "postprocess": postprocess_settings.describe(),
     }
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    full_name: str | None
+    role: UserRole
+    is_active: bool
 
 
 class PlateListRequest(BaseModel):
@@ -133,8 +155,40 @@ class ChannelRequest(BaseModel):
     description: str | None = Field(None, description="Комментарий или место установки")
 
 
+@router.post(
+    "/auth/token",
+    response_model=TokenResponse,
+    summary="Получить JWT токен (OAuth2 password flow)",
+)
+def issue_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user: User | None = db.query(User).filter(User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    token = create_access_token(subject=str(user.id), role=user.role.value)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": 60 * get_settings().jwt_expires_minutes,
+    }
+
+
+@router.get(
+    "/auth/me",
+    response_model=UserResponse,
+    summary="Текущий пользователь и его роль",
+)
+def auth_me(current_user: User = Depends(require_role(UserRole.viewer))) -> User:
+    return current_user
+
+
 @router.post("/ingest/channels", summary="Зарегистрировать канал для ingest")
-def register_channel(request: ChannelRequest) -> dict:
+def register_channel(
+    request: ChannelRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     channel = ChannelConfig(
         channel_id=request.channel_id,
         name=request.name,
@@ -151,32 +205,54 @@ def register_channel(request: ChannelRequest) -> dict:
     return status.as_dict()
 
 
-@router.get("/ingest/channels", summary="Снимок состояния ingest по каналам")
-def ingest_channels() -> list[dict]:
+@router.get(
+    "/ingest/channels",
+    summary="Снимок состояния ingest по каналам",
+)
+def ingest_channels(current_user: User = Depends(require_role(UserRole.viewer))) -> list[dict]:
     return ingest_manager.snapshot()
 
 
-@router.post("/lists", summary="Создать список номеров")
-def create_plate_list(request: PlateListRequest) -> dict:
+@router.post(
+    "/lists",
+    summary="Создать список номеров",
+)
+def create_plate_list(
+    request: PlateListRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     payload = PlateListPayload(**request.model_dump())
     created = rules_engine.register_list(payload)
     return created.model_dump()
 
 
-@router.post("/lists/{list_id}/items", summary="Добавить элемент в список")
-def add_plate_list_item(list_id: str, request: PlateListItemRequest) -> dict:
+@router.post(
+    "/lists/{list_id}/items",
+    summary="Добавить элемент в список",
+)
+def add_plate_list_item(
+    list_id: str,
+    request: PlateListItemRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     item = request.model_dump()
     updated = rules_engine.add_item(list_id, item)
     return updated.model_dump()
 
 
-@router.get("/lists", summary="Получить все списки и элементы")
-def get_plate_lists() -> list[dict]:
+@router.get(
+    "/lists",
+    summary="Получить все списки и элементы",
+)
+def get_plate_lists(current_user: User = Depends(require_role(UserRole.viewer))) -> list[dict]:
     return [item.model_dump() for item in rules_engine.lists.values()]
 
 
 @router.post("/rules", summary="Зарегистрировать правило IF→THEN")
-def create_rule(request: RuleRequest) -> dict:
+def create_rule(
+    request: RuleRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     rule = RuleDefinition(
         name=request.name,
         conditions=request.conditions,
@@ -187,12 +263,15 @@ def create_rule(request: RuleRequest) -> dict:
 
 
 @router.get("/rules/status", summary="Статус Rules Engine, условия и действия")
-def rules_status() -> dict:
+def rules_status(current_user: User = Depends(require_role(UserRole.viewer))) -> dict:
     return rules_engine.describe()
 
 
 @router.post("/events", summary="Записать событие распознавания")
-def record_event(request: EventRequest) -> dict:
+def record_event(
+    request: EventRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     event = event_manager.record_event(
         channel_id=request.channel_id,
         track_id=request.track_id,
@@ -208,7 +287,7 @@ def record_event(request: EventRequest) -> dict:
 
 
 @router.get("/events/status", summary="Статус Event Manager, Webhook Service и Alarm Relay")
-def events_status() -> dict:
+def events_status(current_user: User = Depends(require_role(UserRole.viewer))) -> dict:
     return {
         "events": event_manager.describe(),
         "webhooks": webhook_service.describe(),
@@ -216,8 +295,29 @@ def events_status() -> dict:
     }
 
 
-@router.post("/webhooks/subscriptions", summary="Зарегистрировать webhook подписку")
-def create_webhook_subscription(request: WebhookSubscriptionRequest) -> dict:
+@router.get("/events", summary="Последние события распознавания")
+def list_events(
+    channel_id: str | None = None,
+    plate: str | None = None,
+    limit: int = 50,
+    current_user: User = Depends(require_role(UserRole.viewer)),
+) -> list[dict]:
+    query = list(reversed(event_manager.events))
+    if channel_id:
+        query = [event for event in query if event.channel_id == channel_id]
+    if plate:
+        query = [event for event in query if event.plate and plate.lower() in event.plate.lower()]
+    return [event.as_dict() for event in query[:limit]]
+
+
+@router.post(
+    "/webhooks/subscriptions",
+    summary="Зарегистрировать webhook подписку",
+)
+def create_webhook_subscription(
+    request: WebhookSubscriptionRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     subscription = webhook_service.register_subscription(
         name=request.name,
         url=request.url,
@@ -228,12 +328,17 @@ def create_webhook_subscription(request: WebhookSubscriptionRequest) -> dict:
 
 
 @router.get("/webhooks/subscriptions", summary="Получить активные подписки")
-def list_webhook_subscriptions() -> list[dict]:
+def list_webhook_subscriptions(
+    current_user: User = Depends(require_role(UserRole.viewer)),
+) -> list[dict]:
     return [item.as_dict() for item in webhook_service.subscriptions.values()]
 
 
 @router.post("/alarms/relays", summary="Добавить реле камеры")
-def register_alarm_relay(request: AlarmRelayRequest) -> dict:
+def register_alarm_relay(
+    request: AlarmRelayRequest,
+    current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
+) -> dict:
     relay = alarm_relay_controller.register_relay(
         name=request.name,
         channel_id=request.channel_id,
@@ -245,11 +350,18 @@ def register_alarm_relay(request: AlarmRelayRequest) -> dict:
 
 
 @router.get("/alarms/relays", summary="Получить список реле")
-def list_alarm_relays() -> list[dict]:
+def list_alarm_relays(
+    current_user: User = Depends(require_role(UserRole.viewer)),
+) -> list[dict]:
     return [relay.as_dict() for relay in alarm_relay_controller.relays.values()]
 
 
-@router.post("/alarms/relays/{relay_id}/trigger", summary="Сработать реле")
-def trigger_alarm_relay(relay_id: str) -> dict:
+@router.post(
+    "/alarms/relays/{relay_id}/trigger",
+    summary="Сработать реле",
+)
+def trigger_alarm_relay(
+    relay_id: str, current_user: User = Depends(require_role(UserRole.operator, UserRole.admin))
+) -> dict:
     relay = alarm_relay_controller.trigger(relay_id)
     return relay.as_dict()

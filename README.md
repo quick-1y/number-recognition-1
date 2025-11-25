@@ -33,9 +33,10 @@
   - Webhook Service для регистрации подписок, HMAC подписи и параметров backoff, логирование доставок in-memory.
   - Alarm Relay Controller с режимами реле, задержкой/антидребезгом и API регистрации/сработки реле.
   - Документировано в `docs/events.md`.
-- [ ] Шаг 8: API и авторизация
-  - REST API для событий, поиска, каналов, списков, изображений и сценариев.
-  - JWT/OAuth2, RBAC (admin/operator/viewer), аудит изменений настрое, TLS для внешних интерфейсов.
+- [x] Шаг 8: API и авторизация
+  - REST API покрывает события, поиск, каналы ingest, списки и сценарии, webhooks и реле.
+  - Добавлена авторизация JWT (OAuth2 password), RBAC (admin/operator/viewer) и проверки ролей на эндпоинтах.
+  - Документирован быстрый путь получения токена и вызова защищённых API.
 - [ ] Шаг 9: Веб-интерфейс администратора и оператора
   - Сетка каналов (1×1, 1×2, 2×2, 2×3, 3×3), вкладки «События», «Поиск», «Списки», «Настройки», «Диагностика».
   - Маскирование номеров для роли viewer, настройка сроков хранения изображений и экспорта (CSV/JSON/PDF).
@@ -75,10 +76,23 @@
    npm install
    npm run dev
    ```
-5. Регистрация тестового канала ingest (опционально, после запуска backend):
+5. Создайте пользователя в БД (например, admin). Пример SQL после применения миграций:
+   ```sql
+   INSERT INTO users (id, email, full_name, hashed_password, role, is_active)
+   VALUES (gen_random_uuid(), 'admin@example.com', 'Admin', '<bcrypt_hash>', 'admin', true);
+   -- bcrypt-hash можно сгенерировать так: python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('admin123'))"
+   ```
+6. Получите JWT токен (OAuth2 password flow) и сохраните его в переменную окружения:
+   ```bash
+   export TOKEN=$(curl -X POST http://localhost:8000/api/v1/auth/token \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "username=admin@example.com&password=admin123" | jq -r .access_token)
+   ```
+7. Регистрация тестового канала ingest (опционально, после запуска backend):
    ```bash
    curl -X POST http://localhost:8000/api/v1/ingest/channels \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer $TOKEN" \
      -d '{
        "channel_id": "demo-rtsp",
        "name": "Demo RTSP",
@@ -89,15 +103,17 @@
        "direction": "any"
      }'
    ```
-6. Проверка конфигурации детектора/трекера/OCR (шаг 4):
+8. Проверка конфигурации детектора/трекера/OCR (шаг 4):
    ```bash
-   curl http://localhost:8000/api/v1/pipeline/status | jq
+   curl http://localhost:8000/api/v1/pipeline/status \
+     -H "Authorization: Bearer $TOKEN" | jq
    ```
-7. В ответе появится блок `postprocess` (шаг 5) с текущими порогами, шаблонами стран и настройками антидубликатов.
-8. Создание списка номеров и правила (шаг 6):
+9. В ответе появится блок `postprocess` (шаг 5) с текущими порогами, шаблонами стран и настройками антидубликатов.
+10. Создание списка номеров и правила (шаг 6):
    ```bash
    curl -X POST http://localhost:8000/api/v1/lists \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer $TOKEN" \
      -d '{
        "name": "VIP",
        "type": "white",
@@ -108,17 +124,25 @@
 
    curl -X POST http://localhost:8000/api/v1/rules \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer $TOKEN" \
      -d '{
        "name": "VIP open gate",
        "conditions": {"list_type": "white", "min_confidence": 0.7, "anti_flood_seconds": 30},
        "actions": {"trigger_relay": true, "send_webhook": true, "annotate_ui": true}
      }'
    ```
-9. Запись события распознавания и проверка статусов сервисов уведомлений (шаг 7):
+11. Запись события распознавания и проверка статусов сервисов уведомлений (шаг 7):
    ```bash
    curl -X POST http://localhost:8000/api/v1/events \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer $TOKEN" \
      -d '{"channel_id":"demo-rtsp","plate":"A123BC77","confidence":0.8,"direction":"any","image_url":"s3://plates-events/demo/best.jpg"}'
 
-   curl http://localhost:8000/api/v1/events/status | jq
+   curl http://localhost:8000/api/v1/events/status \
+     -H "Authorization: Bearer $TOKEN" | jq
+   ```
+12. Поиск последних событий (шаг 8):
+   ```bash
+   curl "http://localhost:8000/api/v1/events?plate=A123&limit=5" \
+     -H "Authorization: Bearer $TOKEN" | jq
    ```

@@ -6,6 +6,7 @@ from app.pipeline import (
     ChannelDirection,
     DecoderPriority,
     ingest_manager,
+    postprocess_settings,
     recognition_pipeline,
 )
 
@@ -38,9 +39,12 @@ def modules() -> dict[str, list[str]]:
     }
 
 
-@router.get("/pipeline/status", summary="Конфигурация детектора, трекера и OCR")
+@router.get("/pipeline/status", summary="Конфигурация детектора, трекера, OCR и постобработки")
 def pipeline_status() -> dict:
-    return recognition_pipeline.describe()
+    return {
+        **recognition_pipeline.describe(),
+        "postprocess": postprocess_settings.describe(),
+    }
 
 
 class ChannelRequest(BaseModel):

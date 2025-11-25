@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     ocr_min_confidence: float = Field(0.6, validation_alias="OCR_MIN_CONFIDENCE")
     ocr_languages: list[str] = Field(default_factory=lambda: ["en", "ru"], validation_alias="OCR_LANGUAGES")
 
+    postprocess_vote_by_char: bool = Field(True, validation_alias="POSTPROCESS_VOTE_BY_CHAR")
+    postprocess_min_confidence: float = Field(0.55, validation_alias="POSTPROCESS_MIN_CONFIDENCE")
+    postprocess_min_frames_for_event: int = Field(3, validation_alias="POSTPROCESS_MIN_FRAMES_FOR_EVENT")
+    postprocess_anti_duplicate_seconds: int = Field(5, validation_alias="POSTPROCESS_ANTI_DUPLICATE_SECONDS")
+    postprocess_country_templates: list[str] = Field(
+        default_factory=lambda: ["ru", "by", "kz", "ua", "eu"], validation_alias="POSTPROCESS_COUNTRY_TEMPLATES"
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
@@ -71,6 +79,13 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("postprocess_country_templates", mode="before")
+    @classmethod
+    def parse_country_templates(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+        return [item.lower() for item in value]
 
 
 def get_settings() -> Settings:

@@ -79,5 +79,14 @@ curl -X POST http://localhost:8000/api/v1/ingest/channels \
 - Все mutating endpoints (ingest, lists, rules, events, webhooks, relays) требуют ролей `operator` или `admin`, чтение — `viewer` и выше.
 - Пример SQL для создания пользователя в README (секция быстрого старта); используйте bcrypt-хэш пароля.
 
-## Ближайшие доработки
-- Шаг 9: интеграция с фронтендом и UI для RBAC/аудита.
+## Мониторинг, логирование и тестирование (шаг 10)
+- `/metrics` — экспорт Prometheus; `/api/v1/monitoring/status` — JSON-снимок.
+- `app/monitoring.py` — in-memory registry для счетчиков/гейджей/гистограмм.
+- `app/core/logging.py` — JSON-логирование, интеграция с Sentry (опционально).
+
+## Развёртывание (шаг 11)
+- Dockerfile для backend, docker-compose.yml поднимает postgres/minio/backend/frontend.
+- В Kubernetes подключайте `/metrics` через ServiceMonitor/Prometheus Operator.
+
+## Эксплуатация (шаг 12)
+- Экспорт/отчёты по событиям (CSV/JSON/PDF) и расширения (ReID, PTZ) описаны в `docs/operations.md`.

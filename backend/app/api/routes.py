@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import PlainTextResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from app.core.security import create_access_token, verify_password
 from app.api.deps import get_db, require_role
 from app.db.models import User, UserRole
 from app.events import alarm_relay_controller, event_manager, webhook_service
+from app.monitoring import base_operational_snapshot, metrics_registry
 from app.pipeline import (
     ChannelConfig,
     ChannelDirection,
@@ -43,6 +45,22 @@ rules_engine = build_rules_engine(
 @router.get("/health", summary="Service health-check")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/monitoring/status", summary="Снимок метрик и состояния сервисов")
+def monitoring_status(current_user: User = Depends(require_role(UserRole.viewer))) -> dict:
+    metrics_registry.set_gauge("ingest_channels", len(ingest_manager.channels))
+    metrics_registry.set_gauge("webhook_subscriptions", len(webhook_service.subscriptions))
+    metrics_registry.set_gauge("relay_count", len(alarm_relay_controller.relays))
+    return {
+        "snapshot": base_operational_snapshot(),
+        "metrics": metrics_registry.describe(),
+    }
+
+
+@router.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)
+def prometheus_metrics() -> str:
+    return metrics_registry.export_prometheus()
 
 
 @router.get("/modules", summary="List core modules and responsibilities")
@@ -188,10 +206,10 @@ def auth_me(current_user: User = Depends(require_role(UserRole.viewer))) -> User
 def register_channel(
     request: ChannelRequest,
     current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
-) -> dict:
-    channel = ChannelConfig(
-        channel_id=request.channel_id,
-        name=request.name,
+    ) -> dict:
+        channel = ChannelConfig(
+            channel_id=request.channel_id,
+            name=request.name,
         source=request.source,
         protocol=request.protocol,
         target_fps=request.target_fps,
@@ -202,6 +220,7 @@ def register_channel(
         description=request.description,
     )
     status = ingest_manager.register_channel(channel)
+    metrics_registry.set_gauge("ingest_channels", len(ingest_manager.channels))
     return status.as_dict()
 
 
@@ -223,6 +242,7 @@ def create_plate_list(
 ) -> dict:
     payload = PlateListPayload(**request.model_dump())
     created = rules_engine.register_list(payload)
+    metrics_registry.inc("lists_created", labels={"type": payload.type.value})
     return created.model_dump()
 
 
@@ -237,6 +257,7 @@ def add_plate_list_item(
 ) -> dict:
     item = request.model_dump()
     updated = rules_engine.add_item(list_id, item)
+    metrics_registry.inc("list_items", labels={"list_id": list_id})
     return updated.model_dump()
 
 
@@ -259,6 +280,7 @@ def create_rule(
         actions=request.actions or rules_engine.default_actions,
     )
     created = rules_engine.register_rule(rule)
+    metrics_registry.inc("rules_registered")
     return created.model_dump()
 
 
@@ -283,6 +305,10 @@ def record_event(
         image_url=request.image_url,
         meta=request.meta,
     )
+    metrics_registry.inc(
+        "events", labels={"channel": request.channel_id or "unknown", "country": request.country or "n/a"}
+    )
+    metrics_registry.observe("event_confidence", request.confidence)
     return event.as_dict()
 
 
@@ -324,6 +350,7 @@ def create_webhook_subscription(
         secret=request.secret,
         filters=request.filters,
     )
+    metrics_registry.set_gauge("webhook_subscriptions", len(webhook_service.subscriptions))
     return subscription.as_dict()
 
 
@@ -346,6 +373,7 @@ def register_alarm_relay(
         delay_ms=request.delay_ms,
         debounce_ms=request.debounce_ms,
     )
+    metrics_registry.set_gauge("relay_count", len(alarm_relay_controller.relays))
     return relay.as_dict()
 
 
@@ -364,4 +392,5 @@ def trigger_alarm_relay(
     relay_id: str, current_user: User = Depends(require_role(UserRole.operator, UserRole.admin))
 ) -> dict:
     relay = alarm_relay_controller.trigger(relay_id)
+    metrics_registry.inc("relay_triggers", labels={"relay_id": relay_id})
     return relay.as_dict()

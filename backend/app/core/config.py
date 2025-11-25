@@ -17,6 +17,11 @@ class Settings(BaseSettings):
 
     api_rate_limit: str | None = Field(None, validation_alias="API_RATE_LIMIT")
     log_level: str = Field("INFO", validation_alias="LOG_LEVEL")
+    log_format: str = Field("json", validation_alias="LOG_FORMAT")
+    sentry_dsn: str | None = Field(None, validation_alias="SENTRY_DSN")
+    sentry_traces_sample_rate: float = Field(0.0, validation_alias="SENTRY_TRACES_SAMPLE_RATE")
+    metrics_enabled: bool = Field(True, validation_alias="METRICS_ENABLED")
+    metrics_namespace: str = Field("number_recognition", validation_alias="METRICS_NAMESPACE")
 
     ingest_default_target_fps: int = Field(12, validation_alias="INGEST_DEFAULT_TARGET_FPS")
     ingest_reconnect_seconds: int = Field(3, validation_alias="INGEST_RECONNECT_SECONDS")
@@ -82,6 +87,7 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
+        "log_format",
         "detector_model",
         "detector_device",
         "tracker_type",

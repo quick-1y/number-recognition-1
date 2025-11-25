@@ -5,6 +5,7 @@
 ## Структура
 - `app/main.py` — создание FastAPI приложения, базовые пробные эндпоинты и подключение маршрутов.
 - `app/api/` — маршруты API v1.
+- `app/core/config.py` — конфигурация через переменные окружения (Pydantic BaseSettings).
 - `requirements.txt` — минимальные зависимости FastAPI.
 
 ## Быстрый старт (dev)
@@ -12,6 +13,7 @@
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp ../.env.example ../.env  # при необходимости обновите значения
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

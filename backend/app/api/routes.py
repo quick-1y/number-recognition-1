@@ -6,6 +6,7 @@ from app.pipeline import (
     ChannelDirection,
     DecoderPriority,
     ingest_manager,
+    recognition_pipeline,
 )
 
 router = APIRouter()
@@ -35,6 +36,11 @@ def modules() -> dict[str, list[str]]:
         ],
         "interfaces": ["api", "ui", "monitoring"],
     }
+
+
+@router.get("/pipeline/status", summary="Конфигурация детектора, трекера и OCR")
+def pipeline_status() -> dict:
+    return recognition_pipeline.describe()
 
 
 class ChannelRequest(BaseModel):

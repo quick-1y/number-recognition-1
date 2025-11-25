@@ -24,6 +24,15 @@ from .recognition import (
     TrackerType,
     recognition_pipeline,
 )
+from app.rules import (
+    PlateListPayload,
+    PlateListType,
+    RuleAction,
+    RuleCondition,
+    RuleDefinition,
+    RulesEngine,
+    build_rules_engine,
+)
 
 __all__ = [
     "IngestManager",
@@ -51,4 +60,11 @@ __all__ = [
     "TrackerSettings",
     "TrackerType",
     "recognition_pipeline",
+    "PlateListPayload",
+    "PlateListType",
+    "RuleAction",
+    "RuleCondition",
+    "RuleDefinition",
+    "RulesEngine",
+    "build_rules_engine",
 ]

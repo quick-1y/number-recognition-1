@@ -49,6 +49,13 @@ class Settings(BaseSettings):
         default_factory=lambda: ["ru", "by", "kz", "ua", "eu"], validation_alias="POSTPROCESS_COUNTRY_TEMPLATES"
     )
 
+    rules_default_min_confidence: float = Field(0.6, validation_alias="RULES_DEFAULT_MIN_CONFIDENCE")
+    rules_default_anti_flood_seconds: int = Field(10, validation_alias="RULES_DEFAULT_ANTI_FLOOD_SECONDS")
+    rules_default_min_frames: int = Field(3, validation_alias="RULES_DEFAULT_MIN_FRAMES")
+    rules_default_actions: list[str] = Field(
+        default_factory=lambda: ["send_webhook", "annotate_ui"], validation_alias="RULES_DEFAULT_ACTIONS"
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
@@ -86,6 +93,13 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip().lower() for item in value.split(",") if item.strip()]
         return [item.lower() for item in value]
+
+    @field_validator("rules_default_actions", mode="before")
+    @classmethod
+    def parse_rule_actions(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
 
 def get_settings() -> Settings:

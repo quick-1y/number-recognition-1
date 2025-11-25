@@ -65,6 +65,13 @@ curl -X POST http://localhost:8000/api/v1/ingest/channels \
 - API `/api/v1/rules` и `/api/v1/rules/status` — регистрация правил IF→THEN и просмотр текущих условий/действий/списков.
 - Переменные `RULES_DEFAULT_*` в `.env.example` — дефолтные пороги уверенности, антифлуд и действия.
 
+## События, webhooks и реле (шаг 7)
+- `app/events/__init__.py` — Event Manager (in-memory), Webhook Service и Alarm Relay Controller.
+- API `/api/v1/events` и `/api/v1/events/status` — запись события распознавания и снимок статусов (events/webhooks/relays).
+- API `/api/v1/webhooks/subscriptions` — регистрация и просмотр подписок с HMAC секретом и настройками повторов.
+- API `/api/v1/alarms/relays` и `/api/v1/alarms/relays/{id}/trigger` — управление реле камер и тестовая сработка.
+- Новые переменные окружения: `EVENTS_*`, `WEBHOOK_*`, `ALARM_RELAY_*` (см. `.env.example`).
+
 ## Ближайшие доработки
 - Шаг 7–8: сервис событий, вебхуки, реле и полнофункциональный REST API с авторизацией.
 - Шаг 9: интеграция с фронтендом и ролевой моделью (RBAC).

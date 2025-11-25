@@ -49,6 +49,18 @@ class Settings(BaseSettings):
         default_factory=lambda: ["ru", "by", "kz", "ua", "eu"], validation_alias="POSTPROCESS_COUNTRY_TEMPLATES"
     )
 
+    events_s3_prefix: str = Field("events", validation_alias="EVENTS_S3_PREFIX")
+    events_image_ttl_days: int = Field(90, validation_alias="EVENTS_IMAGE_TTL_DAYS")
+    events_clip_before_seconds: int = Field(3, validation_alias="EVENTS_CLIP_BEFORE_SECONDS")
+    events_clip_after_seconds: int = Field(3, validation_alias="EVENTS_CLIP_AFTER_SECONDS")
+
+    webhook_max_attempts: int = Field(5, validation_alias="WEBHOOK_MAX_ATTEMPTS")
+    webhook_backoff_seconds: int = Field(30, validation_alias="WEBHOOK_BACKOFF_SECONDS")
+    webhook_signature_header: str = Field("X-Signature", validation_alias="WEBHOOK_SIGNATURE_HEADER")
+
+    alarm_relay_default_mode: str = Field("toggle", validation_alias="ALARM_RELAY_DEFAULT_MODE")
+    alarm_relay_debounce_ms: int = Field(200, validation_alias="ALARM_RELAY_DEBOUNCE_MS")
+
     rules_default_min_confidence: float = Field(0.6, validation_alias="RULES_DEFAULT_MIN_CONFIDENCE")
     rules_default_anti_flood_seconds: int = Field(10, validation_alias="RULES_DEFAULT_ANTI_FLOOD_SECONDS")
     rules_default_min_frames: int = Field(3, validation_alias="RULES_DEFAULT_MIN_FRAMES")
@@ -100,6 +112,11 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("alarm_relay_default_mode", mode="before")
+    @classmethod
+    def normalize_alarm_mode(cls, value: str) -> str:
+        return value.lower() if isinstance(value, str) else value
 
 
 def get_settings() -> Settings:

@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -86,3 +86,70 @@ class PlateListItem(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     plate_list = relationship("PlateList", back_populates="items")
+
+
+class RelayMode(str, enum.Enum):
+    toggle = "toggle"
+    close_open = "close_open"
+    open_close = "open_close"
+    hold_close = "hold_close"
+    hold_open = "hold_open"
+
+
+class AlarmRelay(Base):
+    __tablename__ = "alarm_relays"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    name = Column(String(255), nullable=False)
+    channel_id = Column(UUID(as_uuid=True), ForeignKey("channels.id", ondelete="SET NULL"), nullable=True)
+    mode = Column(Enum(RelayMode, name="relay_mode"), nullable=False, default=RelayMode.toggle)
+    delay_ms = Column(Integer, nullable=False, default=0)
+    debounce_ms = Column(Integer, nullable=False, default=200)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class Recognition(Base):
+    __tablename__ = "recognitions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    channel_id = Column(UUID(as_uuid=True), ForeignKey("channels.id", ondelete="SET NULL"), nullable=True)
+    track_id = Column(String(64), nullable=True)
+    plate = Column(String(32), nullable=True)
+    confidence = Column(Float, nullable=False, default=0.0)
+    country_pattern = Column(String(16), nullable=True)
+    bbox = Column(JSON, nullable=True)
+    direction = Column(Enum(ChannelDirection, name="channel_direction"), nullable=True)
+    image_url = Column(String(1024), nullable=True)
+    meta = Column(JSON, nullable=True)
+    best_frame_ts = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class WebhookSubscription(Base):
+    __tablename__ = "webhook_subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    name = Column(String(255), nullable=False)
+    url = Column(String(1024), nullable=False)
+    secret = Column(String(255), nullable=True)
+    filters = Column(JSON, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    subscription_id = Column(UUID(as_uuid=True), ForeignKey("webhook_subscriptions.id", ondelete="SET NULL"), nullable=True)
+    event_id = Column(UUID(as_uuid=True), ForeignKey("recognitions.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String(32), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True)
+    response_code = Column(Integer, nullable=True)
+    response_body = Column(String(2048), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

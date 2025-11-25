@@ -28,10 +28,11 @@
 - [x] Шаг 6: Правила, списки и сценарии
   - CRUD-заготовки для списков (белый/чёрный/информационный) с TTL, приоритетом и расписаниями, модели и миграции в БД.
   - Rules Engine в виде конфигурируемого сервиса с условиями (списки, канал, время, уверенность, направление, антифлуд) и действиями (реле, webhooks, запись клипа, метки), статусы доступны через API.
-- [ ] Шаг 7: Сервис событий и уведомлений
-  - Event Manager для записи событий в БД и S3, генерация метаданных.
-  - Webhook Service с HMAC подписью, повторными отправками и логированием доставок.
-  - Alarm Relay Controller с режимами реле, задержками и антидребезгом.
+- [x] Шаг 7: Сервис событий и уведомлений
+  - Добавлен Event Manager (in-memory) с API записи событий и конфигурацией S3/TTL для изображений/клипов.
+  - Webhook Service для регистрации подписок, HMAC подписи и параметров backoff, логирование доставок in-memory.
+  - Alarm Relay Controller с режимами реле, задержкой/антидребезгом и API регистрации/сработки реле.
+  - Документировано в `docs/events.md`.
 - [ ] Шаг 8: API и авторизация
   - REST API для событий, поиска, каналов, списков, изображений и сценариев.
   - JWT/OAuth2, RBAC (admin/operator/viewer), аудит изменений настрое, TLS для внешних интерфейсов.
@@ -112,4 +113,12 @@
        "conditions": {"list_type": "white", "min_confidence": 0.7, "anti_flood_seconds": 30},
        "actions": {"trigger_relay": true, "send_webhook": true, "annotate_ui": true}
      }'
+   ```
+9. Запись события распознавания и проверка статусов сервисов уведомлений (шаг 7):
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/events \
+     -H "Content-Type: application/json" \
+     -d '{"channel_id":"demo-rtsp","plate":"A123BC77","confidence":0.8,"direction":"any","image_url":"s3://plates-events/demo/best.jpg"}'
+
+   curl http://localhost:8000/api/v1/events/status | jq
    ```

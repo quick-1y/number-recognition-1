@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
+from app.events import alarm_relay_controller, event_manager, webhook_service
 from app.pipeline import (
     ChannelConfig,
     ChannelDirection,
@@ -90,6 +91,33 @@ class RuleRequest(BaseModel):
     actions: RuleAction | None = None
 
 
+class EventRequest(BaseModel):
+    channel_id: str | None = Field(None, description="Канал, откуда пришло событие")
+    track_id: str | None = Field(None, description="Track ID из трекера")
+    plate: str | None = Field(None, description="Распознанный номер")
+    confidence: float = Field(0.0, description="Уверенность распознавания")
+    country: str | None = Field(None, description="Шаблон страны")
+    bbox: list[float] | None = Field(None, description="Геометрия номера")
+    direction: ChannelDirection | None = Field(None, description="Направление движения")
+    image_url: str | None = Field(None, description="Ссылка на изображение/кадр")
+    meta: dict | None = Field(None, description="Доп. метаданные события")
+
+
+class WebhookSubscriptionRequest(BaseModel):
+    name: str
+    url: str
+    secret: str | None = Field(None, description="Секрет для HMAC подписи")
+    filters: dict | None = Field(None, description="Фильтры событий по спискам/каналам")
+
+
+class AlarmRelayRequest(BaseModel):
+    name: str
+    channel_id: str | None = Field(None, description="Канал или камера")
+    mode: str | None = Field(None, description="Режим реле")
+    delay_ms: int | None = Field(None, description="Задержка между командами")
+    debounce_ms: int | None = Field(None, description="Антидребезг")
+
+
 class ChannelRequest(BaseModel):
     channel_id: str = Field(..., description="Уникальный идентификатор канала")
     name: str = Field(..., description="Человекочитаемое имя канала")
@@ -161,3 +189,67 @@ def create_rule(request: RuleRequest) -> dict:
 @router.get("/rules/status", summary="Статус Rules Engine, условия и действия")
 def rules_status() -> dict:
     return rules_engine.describe()
+
+
+@router.post("/events", summary="Записать событие распознавания")
+def record_event(request: EventRequest) -> dict:
+    event = event_manager.record_event(
+        channel_id=request.channel_id,
+        track_id=request.track_id,
+        plate=request.plate,
+        confidence=request.confidence,
+        country=request.country,
+        bbox=request.bbox,
+        direction=request.direction.value if request.direction else None,
+        image_url=request.image_url,
+        meta=request.meta,
+    )
+    return event.as_dict()
+
+
+@router.get("/events/status", summary="Статус Event Manager, Webhook Service и Alarm Relay")
+def events_status() -> dict:
+    return {
+        "events": event_manager.describe(),
+        "webhooks": webhook_service.describe(),
+        "alarm_relays": alarm_relay_controller.describe(),
+    }
+
+
+@router.post("/webhooks/subscriptions", summary="Зарегистрировать webhook подписку")
+def create_webhook_subscription(request: WebhookSubscriptionRequest) -> dict:
+    subscription = webhook_service.register_subscription(
+        name=request.name,
+        url=request.url,
+        secret=request.secret,
+        filters=request.filters,
+    )
+    return subscription.as_dict()
+
+
+@router.get("/webhooks/subscriptions", summary="Получить активные подписки")
+def list_webhook_subscriptions() -> list[dict]:
+    return [item.as_dict() for item in webhook_service.subscriptions.values()]
+
+
+@router.post("/alarms/relays", summary="Добавить реле камеры")
+def register_alarm_relay(request: AlarmRelayRequest) -> dict:
+    relay = alarm_relay_controller.register_relay(
+        name=request.name,
+        channel_id=request.channel_id,
+        mode=request.mode,
+        delay_ms=request.delay_ms,
+        debounce_ms=request.debounce_ms,
+    )
+    return relay.as_dict()
+
+
+@router.get("/alarms/relays", summary="Получить список реле")
+def list_alarm_relays() -> list[dict]:
+    return [relay.as_dict() for relay in alarm_relay_controller.relays.values()]
+
+
+@router.post("/alarms/relays/{relay_id}/trigger", summary="Сработать реле")
+def trigger_alarm_relay(relay_id: str) -> dict:
+    relay = alarm_relay_controller.trigger(relay_id)
+    return relay.as_dict()

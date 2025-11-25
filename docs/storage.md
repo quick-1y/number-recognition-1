@@ -39,6 +39,12 @@
 | `JWT_EXPIRES_MINUTES` | Время жизни токена (в минутах). |
 | `API_RATE_LIMIT` | Ограничение на запросы (при необходимости). |
 | `LOG_LEVEL` | `INFO`/`DEBUG`/`WARNING` и т.п. |
+| `EVENTS_S3_PREFIX` | Префикс путей хранения изображений/клипов событий. |
+| `EVENTS_IMAGE_TTL_DAYS` | TTL изображений событий (дней). |
+| `EVENTS_CLIP_BEFORE_SECONDS` / `EVENTS_CLIP_AFTER_SECONDS` | Отступы клипа до/после события. |
+| `WEBHOOK_MAX_ATTEMPTS` / `WEBHOOK_BACKOFF_SECONDS` | Настройки повторной доставки webhook. |
+| `WEBHOOK_SIGNATURE_HEADER` | Заголовок для HMAC подписи уведомлений. |
+| `ALARM_RELAY_DEFAULT_MODE` / `ALARM_RELAY_DEBOUNCE_MS` | Режим и антидребезг реле по умолчанию. |
 
 ### Рекомендации по миграциям
 - Использовать Alembic для версионирования схемы PostgreSQL; базовые миграции создают таблицы из раздела выше.

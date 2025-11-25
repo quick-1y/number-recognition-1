@@ -15,9 +15,9 @@
   - Спецификация схемы БД PostgreSQL и структуры объектного хранилища S3/MinIO (docs/storage.md).
   - Настроены миграции Alembic, базовые модели пользователей и ролей, подключение конфигурации (env, secrets).
   - Добавлены шаблоны переменных окружения (.env.example) и модуль конфигурации backend.
-- [ ] Шаг 3: Приём и декодирование видеопотока
-  - Реализовать ingest для RTSP/ONVIF/файлов, авто-переподключение и целевой FPS.
-  - Добавить NVDEC/VAAPI приоритизацию, обработку межстрочности/стабилизации при необходимости.
+- [x] Шаг 3: Приём и декодирование видеопотока
+  - Добавлен ingest-менеджер и API регистрации каналов с отражением статуса (`/api/v1/ingest/channels`).
+  - Описан шаг в `docs/ingest.md`, расширена схема БД (таблица `channels`) и переменные окружения для ingest.
 - [ ] Шаг 4: Детекция, трекинг и OCR
   - Интеграция модели детекции (YOLOv8/YOLOv11) с настройками ROI/масок и направления движения.
   - Подключение трекера (ByteTrack/SORT) с расчётом track_id и направления движения.
@@ -73,4 +73,18 @@
    cd frontend
    npm install
    npm run dev
+   ```
+5. Регистрация тестового канала ingest (опционально, после запуска backend):
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/ingest/channels \
+     -H "Content-Type: application/json" \
+     -d '{
+       "channel_id": "demo-rtsp",
+       "name": "Demo RTSP",
+       "source": "rtsp://user:pass@camera/stream",
+       "target_fps": 12,
+       "reconnect_seconds": 3,
+       "decoder_priority": ["nvdec", "vaapi", "cpu"],
+       "direction": "any"
+     }'
    ```

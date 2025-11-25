@@ -6,7 +6,7 @@
 
 | Таблица | Ключевые поля | Описание |
 | --- | --- | --- |
-| `channels` | `id (uuid, pk)`, `name`, `rtsp_url`, `status`, `roi`, `direction`, `created_at`, `updated_at` | Каналы видеовходов и их настройки (ROI, направление движения, статус подключения). |
+| `channels` | `id (uuid, pk)`, `name`, `source`, `protocol`, `is_active`, `target_fps`, `reconnect_seconds`, `decoder_priority`, `roi`, `direction`, `created_at`, `updated_at` | Каналы видеовходов и их настройки: источник (RTSP/файл), целевой FPS, политика переподключения, приоритет декодера, ROI и направление. |
 | `plate_lists` | `id (uuid, pk)`, `name`, `type (white/black/info)`, `priority`, `schedule`, `ttl`, `created_by`, `created_at`, `updated_at` | Списки номеров с приоритетами и расписаниями активности. |
 | `plate_list_items` | `id (uuid, pk)`, `list_id (fk)`, `plate_mask`, `comment`, `expires_at`, `created_at`, `updated_at` | Элементы списков: номер или маска с необязательным TTL. |
 | `recognitions` | `id (uuid, pk)`, `channel_id (fk)`, `track_id`, `plate`, `confidence`, `country_pattern`, `bbox`, `direction`, `best_frame_ts`, `meta`, `image_url`, `created_at` | События распознавания с метаданными и ссылкой на изображение. |

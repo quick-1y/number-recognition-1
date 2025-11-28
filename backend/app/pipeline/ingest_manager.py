@@ -99,6 +99,10 @@ class IngestManager:
         status.last_error = error
         status.restart_count += 1
 
+    @property
+    def channels(self) -> Dict[str, IngestStatus]:
+        return self._channels
+
 
 # Singleton manager for API exposure; actual workers will be attached in later steps.
 ingest_manager = IngestManager()

@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 from pathlib import Path
 import sys
@@ -7,9 +8,15 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError as exc:  # pragma: no cover - dependency guard
+    raise RuntimeError(
+        "python-dotenv is required to run alembic commands. Please install dependencies from backend/requirements.txt."
+    ) from exc
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import get_settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db import models  # noqa: F401,E402
 
@@ -18,8 +25,18 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+dotenv_paths = [
+    Path(__file__).resolve().parents[1] / ".env",
+    Path(__file__).resolve().parents[2] / ".env",
+]
+for env_path in dotenv_paths:
+    load_dotenv(env_path, override=False)
+
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
+    raise RuntimeError("DATABASE_URL environment variable is required for alembic migrations.")
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

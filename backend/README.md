@@ -12,8 +12,14 @@
 
 ## Быстрый старт (dev)
 ```
+# Linux/macOS
 python -m venv .venv
 source .venv/bin/activate
+
+# Windows (PowerShell)
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
 pip install -r requirements.txt
 cp ../.env.example ../.env  # при необходимости обновите значения
 alembic upgrade head         # применить миграции (требуется доступ к БД из DATABASE_URL)

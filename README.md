@@ -64,8 +64,13 @@
 3. Запустите backend (БД создастся автоматически в `backend/data/number_recognition.db` после миграции):
    ```bash
    cd backend
+   # Создание виртуального окружения
+   # Linux/macOS
    python -m venv .venv
    source .venv/bin/activate
+   # Windows (PowerShell)
+   py -m venv .venv
+   .\.venv\Scripts\Activate.ps1
    pip install -r requirements.txt
    alembic upgrade head  # применить миграции в локальную SQLite
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

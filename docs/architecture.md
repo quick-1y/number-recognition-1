@@ -28,7 +28,7 @@
 5. OCR Engine возвращает массив гипотез по кадрам → Postprocessor выполняет голосование и коррекцию.
 6. Postprocessor отдаёт нормализованный номер + confidence → Rules Engine.
 7. Rules Engine применяет списки/расписания → Event Manager.
-8. Event Manager сохраняет событие в PostgreSQL + S3/MinIO, обогащает метаданными (bbox, track, timestamps).
+8. Event Manager сохраняет событие во встроенную SQLite + S3/MinIO, обогащает метаданными (bbox, track, timestamps).
 9. Webhook Service и Alarm Relay Controller получают события/действия из Event Manager.
 10. Admin/API/UI читает события и управление из БД/объектного хранилища, Monitoring/Logging собирает метрики и логи.
 
@@ -47,7 +47,7 @@
 - `backend/` — FastAPI сервис: REST API, обработка событий, управление конфигурацией, интеграции (webhook, реле), метрики.
 - `frontend/` — веб-клиент (React + Vite): интерфейсы оператора/админа, вкладки событий, поиска, списков и настроек.
 - `docs/` — документация по архитектуре, схемам БД и потокам данных (детектор/трекер/OCR см. `docs/detection.md`).
-- `deploy/` (будет добавлен на шаге 11) — Docker Compose/K8s манифесты, настройки GPU.
+- `deploy/` (будет добавлен на шаге 11) — Docker Compose манифесты и настройки GPU.
 
 ## Обновление и расширение
 

@@ -94,12 +94,46 @@ API и авторизация
    > Если при запуске `uvicorn` появляется `ModuleNotFoundError: No module named 'pydantic_settings'`,
    > убедитесь, что зависимости установлены именно из виртуального окружения: выполните
    > `py -m pip install -r requirements.txt` в активированном PowerShell и затем повторите запуск.
-4. Frontend (шаг 9) — веб-интерфейс администратора/оператора на React + Vite:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev  # http://localhost:5173
-   ```
+4. Frontend (шаг 9) — веб-интерфейс администратора/оператора на React + Vite. Ниже приведены подробные инструкции для разных окружений:
+   - **Общие требования**: Node.js 20+ (или LTS 18+), npm 9+, свободный порт 5173. Если используете proxy/antivirus, разрешите загрузку пакетов из npm.
+   - **Windows (PowerShell)**:
+     ```powershell
+     # Включите выполнение сценариев только на текущий процесс, чтобы активировать venv/скрипты
+     Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+
+     cd frontend
+     # Устанавливаем зависимости через встроенный npm
+     npm install
+     # Запускаем dev‑сервер
+     npm run dev -- --host --port 5173  # http://localhost:5173
+     ```
+     Если при установке появляются ошибки прав, запустите PowerShell от имени администратора и удалите кеш: `npm cache clean --force`, затем повторите `npm install`.
+
+   - **Linux/macOS**:
+     ```bash
+     cd frontend
+     npm install
+     npm run dev -- --host --port 5173  # http://localhost:5173
+     ```
+     При отсутствии Node.js установите LTS из https://nodejs.org или через пакетный менеджер (`sudo apt install nodejs npm`, `brew install node`).
+
+   - **WSL 2** (Windows + Ubuntu): устанавливайте Node.js внутри WSL и запускайте `npm run dev -- --host 0.0.0.0 --port 5173`; открывайте в браузере Windows по адресу `http://localhost:5173`.
+
+   - **Docker (frontend отдельно)**:
+     ```bash
+     # Сборка образа UI
+     docker build -t number-recognition-frontend ./frontend
+
+     # Запуск с пробросом API адреса
+     docker run -d --name number-frontend -p 5173:80 \
+       -e VITE_API_BASE_URL=http://localhost:8000 \
+       number-recognition-frontend
+     ```
+
+   - **Диагностика типовых проблем**:
+     - Ошибка `ERR_OSSL_EVP_UNSUPPORTED` — запустите `export NODE_OPTIONS=--openssl-legacy-provider` (Linux/macOS) или `$env:NODE_OPTIONS="--openssl-legacy-provider"` (PowerShell) перед `npm install`.
+     - Конфликт порта 5173 — укажите другой порт: `npm run dev -- --host --port 5174` и откройте соответствующий адрес в браузере.
+     - Повреждённые зависимости — удалите `node_modules` и `package-lock.json`, затем повторите `npm install`.
 5. Создайте пользователя в БД (например, admin) через Python-скрипт после миграций:
    ```bash
    cd backend

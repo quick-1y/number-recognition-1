@@ -10,15 +10,39 @@
 - `src/styles.css` — базовые стили и сетка.
 - `vite.config.ts`, `tsconfig.json` — конфигурация сборки и TypeScript.
 
-## Быстрый старт
+## Быстрый старт и установка
+- Общие требования: Node.js 20+ (или LTS 18+), npm 9+, открытый порт 5173.
+- Убедитесь, что в терминале доступен `node -v` и `npm -v`. Если версии ниже — обновите Node.js с https://nodejs.org.
+
+### Windows (PowerShell)
+```powershell
+# Разрешить скрипты только на текущую сессию (для активации npm-хуков)
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+
+cd frontend
+npm install
+npm run dev -- --host --port 5173   # http://localhost:5173
+```
+Если видите ошибки прав или кеша, очистите: `npm cache clean --force`, затем повторите `npm install`.
+
+### Linux/macOS
 ```bash
 cd frontend
 npm install
-npm run dev   # http://localhost:5173
+npm run dev -- --host --port 5173   # http://localhost:5173
+```
+При конфликтах порта запустите `npm run dev -- --host --port 5174` и откройте указанный адрес.
+
+### Docker
+```bash
+docker build -t number-recognition-frontend ./frontend
+docker run -d --name number-frontend -p 5173:80 \
+  -e VITE_API_BASE_URL=http://localhost:8000 \
+  number-recognition-frontend
 ```
 
 Переменная окружения для разработки:
-- `VITE_API_BASE_URL` — адрес backend (по умолчанию можно оставить пустым и проставлять полный URL в axios/запросах).
+- `VITE_API_BASE_URL` — адрес backend (можно задать в `.env` или при запуске Docker).
 
 ## Текущая функциональность
 - Сетка каналов с выбором раскладки: 1×1, 1×2, 2×2, 2×3, 3×3.

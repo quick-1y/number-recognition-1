@@ -1,15 +1,26 @@
 import asyncio
+import os
 from logging.config import fileConfig
 from pathlib import Path
 import sys
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError as exc:  # pragma: no cover - dependency guard
+    raise RuntimeError(
+        "python-dotenv is required to run alembic commands. Please install dependencies from backend/requirements.txt."
+    ) from exc
 
-from app.core.config import get_settings  # noqa: E402
+BASE_DIR = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = BASE_DIR.parent
+
+sys.path.append(str(BASE_DIR))
+
 from app.db.base import Base  # noqa: E402
 from app.db import models  # noqa: F401,E402
 
@@ -18,8 +29,31 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+dotenv_paths = [
+    BASE_DIR / ".env",
+    PROJECT_ROOT / ".env",
+]
+for env_path in dotenv_paths:
+    load_dotenv(env_path, override=False)
+
+def resolve_database_url() -> str:
+    database_url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is required for alembic migrations.")
+
+    url = make_url(database_url)
+
+    if url.get_backend_name() == "sqlite" and url.database:
+        db_path = Path(url.database)
+        if not db_path.is_absolute():
+            db_path = (PROJECT_ROOT / db_path).resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        url = url.set(database=str(db_path))
+
+    return str(url)
+
+
+config.set_main_option("sqlalchemy.url", resolve_database_url())
 
 target_metadata = Base.metadata
 

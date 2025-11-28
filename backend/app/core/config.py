@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_env: str = Field("development", validation_alias="APP_ENV")
-    database_url: str = Field(..., validation_alias="DATABASE_URL")
+    database_url: str = Field("sqlite:///./data/number_recognition.db", validation_alias="DATABASE_URL")
 
     s3_endpoint: str = Field(..., validation_alias="S3_ENDPOINT")
     s3_region: str | None = Field(None, validation_alias="S3_REGION")
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     ingest_default_target_fps: int = Field(12, validation_alias="INGEST_DEFAULT_TARGET_FPS")
     ingest_reconnect_seconds: int = Field(3, validation_alias="INGEST_RECONNECT_SECONDS")
-    ingest_decoder_priority: list[str] = Field(
+    ingest_decoder_priority: list[str] | str = Field(
         default_factory=lambda: ["nvdec", "vaapi", "cpu"], validation_alias="INGEST_DECODER_PRIORITY"
     )
 
@@ -44,13 +44,13 @@ class Settings(BaseSettings):
     ocr_engine: str = Field("easyocr", validation_alias="OCR_ENGINE")
     ocr_vote_frames: int = Field(3, validation_alias="OCR_VOTE_FRAMES")
     ocr_min_confidence: float = Field(0.6, validation_alias="OCR_MIN_CONFIDENCE")
-    ocr_languages: list[str] = Field(default_factory=lambda: ["en", "ru"], validation_alias="OCR_LANGUAGES")
+    ocr_languages: list[str] | str = Field(default_factory=lambda: ["en", "ru"], validation_alias="OCR_LANGUAGES")
 
     postprocess_vote_by_char: bool = Field(True, validation_alias="POSTPROCESS_VOTE_BY_CHAR")
     postprocess_min_confidence: float = Field(0.55, validation_alias="POSTPROCESS_MIN_CONFIDENCE")
     postprocess_min_frames_for_event: int = Field(3, validation_alias="POSTPROCESS_MIN_FRAMES_FOR_EVENT")
     postprocess_anti_duplicate_seconds: int = Field(5, validation_alias="POSTPROCESS_ANTI_DUPLICATE_SECONDS")
-    postprocess_country_templates: list[str] = Field(
+    postprocess_country_templates: list[str] | str = Field(
         default_factory=lambda: ["ru", "by", "kz", "ua", "eu"], validation_alias="POSTPROCESS_COUNTRY_TEMPLATES"
     )
 
@@ -69,12 +69,12 @@ class Settings(BaseSettings):
     rules_default_min_confidence: float = Field(0.6, validation_alias="RULES_DEFAULT_MIN_CONFIDENCE")
     rules_default_anti_flood_seconds: int = Field(10, validation_alias="RULES_DEFAULT_ANTI_FLOOD_SECONDS")
     rules_default_min_frames: int = Field(3, validation_alias="RULES_DEFAULT_MIN_FRAMES")
-    rules_default_actions: list[str] = Field(
+    rules_default_actions: list[str] | str = Field(
         default_factory=lambda: ["send_webhook", "annotate_ui"], validation_alias="RULES_DEFAULT_ACTIONS"
     )
 
     model_config = {
-        "env_file": ".env",
+        "env_file": (".env", "../.env"),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

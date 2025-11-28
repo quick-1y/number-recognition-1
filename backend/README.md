@@ -5,7 +5,7 @@
 ## Структура
 - `app/main.py` — создание FastAPI приложения, базовые пробные эндпоинты и подключение маршрутов.
 - `app/api/` — маршруты API v1.
-- `app/core/config.py` — конфигурация через переменные окружения (Pydantic BaseSettings).
+- `app/core/config.py` — конфигурация через переменные окружения (Pydantic BaseModel + dotenv).
 - `app/db/` — декларативные модели SQLAlchemy, базовый session factory.
 - `alembic/` — конфигурация и миграции базы данных.
 - `requirements.txt` — зависимости FastAPI, SQLAlchemy и Alembic.
@@ -20,9 +20,7 @@ source .venv/bin/activate
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-   # Устанавливайте зависимости через интерпретатор, к которому привязано venv,
-   # чтобы избежать ошибки "ModuleNotFoundError: No module named 'pydantic_settings'"
-   # при запуске `uvicorn`.
+   # Устанавливайте зависимости через интерпретатор, к которому привязано venv.
    pip install -r requirements.txt            # Linux/macOS
    py -m pip install -r requirements.txt      # Windows (PowerShell)
 cp ../.env.example ../.env  # при необходимости обновите значения
@@ -30,9 +28,9 @@ alembic upgrade head         # применить миграции (требуе
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-> Если при запуске `uvicorn` появляется `ModuleNotFoundError: No module named 'pydantic_settings'`,
-> убедитесь, что зависимости установлены именно из виртуального окружения: выполните
-> `py -m pip install -r requirements.txt` в активированном PowerShell и затем повторите запуск.
+> Если при запуске `uvicorn` появляются ошибки валидации настроек, убедитесь, что
+> переменные окружения заданы (см. `.env.example`) и команды установки зависимостей
+> выполнены из активированного виртуального окружения.
 
 ### Работа с миграциями
 - Редактируйте модели в `app/db/models.py`.

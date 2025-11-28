@@ -12,7 +12,7 @@
   - Подготовлен каркас репозитория: backend (FastAPI) с базовым API/health, frontend (React+Vite) и общие файлы.
   - Определены основные интерфейсы между модулями и входные/выходные структуры событий.
 - [x] Шаг 2: Инфраструктура хранения и конфигурации
-  - Спецификация схемы БД PostgreSQL и структуры объектного хранилища S3/MinIO (docs/storage.md).
+  - Спецификация схемы встроенной SQLite-БД и структуры объектного хранилища S3/MinIO (docs/storage.md).
   - Настроены миграции Alembic, базовые модели пользователей и ролей, подключение конфигурации (env, secrets).
   - Добавлены шаблоны переменных окружения (.env.example) и модуль конфигурации backend.
 - [x] Шаг 3: Приём и декодирование видеопотока
@@ -46,8 +46,8 @@
     - Добавлены `/metrics` для Prometheus, `/api/v1/monitoring/status` для снимка метрик, JSON-логи и опциональный Sentry.
     - Описаны метрики, тестовые видео и нагрузочные проверки (docs/monitoring.md).
   - [x] Шаг 11: Развёртывание и производственные параметры
-    - Docker Compose для backend/frontend/postgres/minio, Dockerfile для сервисов и рекомендации для Kubernetes/GPU.
-    - Документирован тюнинг производительности и наблюдаемости (docs/deployment.md).
+    - Docker Compose для backend/frontend/minio со встроенной SQLite-БД внутри backend, Dockerfile для сервисов.
+    - Kubernetes не используется; документирован тюнинг производительности и наблюдаемости (docs/deployment.md).
   - [x] Шаг 12: Эксплуатационные сценарии и будущие доработки
     - Примеры сценариев, экспортов и рекомендации по развитию (docs/operations.md).
 
@@ -57,30 +57,53 @@
 
 ## Быстрый старт (dev)
 1. Клонируйте репозиторий и перейдите в каталог проекта.
-2. Скопируйте шаблон окружения и при необходимости задайте значения (локально достаточно оставить значения по умолчанию):
+2. Скопируйте шаблон окружения и при необходимости задайте значения (по умолчанию используется встроенная SQLite-БД `./data/number_recognition.db`, внешний PostgreSQL не нужен):
    ```bash
    cp .env.example .env
    ```
-3. Запустите backend:
+3. Запустите backend (БД создастся автоматически в `backend/data/number_recognition.db` после миграции):
    ```bash
    cd backend
+   # Создание виртуального окружения
+   # Linux/macOS
    python -m venv .venv
    source .venv/bin/activate
-   pip install -r requirements.txt
-   alembic upgrade head  # применить миграции (требуется доступ к БД)
+   # Windows (PowerShell)
+   py -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   # Устанавливайте зависимости через интерпретатор, к которому привязано venv,
+   # чтобы избежать ошибки "ModuleNotFoundError: No module named 'pydantic_settings'"
+   # при запуске `uvicorn`.
+   pip install -r requirements.txt            # Linux/macOS
+   py -m pip install -r requirements.txt      # Windows (PowerShell)
+   alembic upgrade head  # применить миграции в локальную SQLite
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
+   > Если при запуске `uvicorn` появляется `ModuleNotFoundError: No module named 'pydantic_settings'`,
+   > убедитесь, что зависимости установлены именно из виртуального окружения: выполните
+   > `py -m pip install -r requirements.txt` в активированном PowerShell и затем повторите запуск.
 4. Frontend (шаг 9) — веб-интерфейс администратора/оператора на React + Vite:
    ```bash
    cd frontend
    npm install
    npm run dev  # http://localhost:5173
    ```
-5. Создайте пользователя в БД (например, admin). Пример SQL после применения миграций:
-   ```sql
-   INSERT INTO users (id, email, full_name, hashed_password, role, is_active)
-   VALUES (gen_random_uuid(), 'admin@example.com', 'Admin', '<bcrypt_hash>', 'admin', true);
-   -- bcrypt-hash можно сгенерировать так: python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('admin123'))"
+5. Создайте пользователя в БД (например, admin) через Python-скрипт после миграций:
+   ```bash
+   cd backend
+   python - <<'PY'
+from passlib.context import CryptContext
+from app.db import models
+from app.db.session import SessionLocal
+
+pwd = CryptContext(schemes=["bcrypt"], deprecated="auto").hash("admin123")
+session = SessionLocal()
+user = models.User(email="admin@example.com", full_name="Admin", hashed_password=pwd, role=models.UserRole.admin, is_active=True)
+session.add(user)
+session.commit()
+session.close()
+print("Создан пользователь:", user.email)
+PY
    ```
 6. Получите JWT токен (OAuth2 password flow) и сохраните его в переменную окружения:
    ```bash
@@ -151,7 +174,41 @@
    curl http://localhost:8000/metrics  # формат Prometheus
    curl http://localhost:8000/api/v1/monitoring/status -H "Authorization: Bearer $TOKEN" | jq
    ```
-14. Запуск всего стека через Docker Compose (шаг 11):
+14. Запуск всего стека через Docker Compose (шаг 11) со встроенной SQLite и MinIO:
    ```bash
    docker compose up --build
+   # при изменениях кода: docker compose build --no-cache && docker compose up
+   ```
+
+## Запуск в Docker (без Compose)
+1. Соберите образы:
+   ```bash
+   docker build -t number-recognition-backend ./backend
+   docker build -t number-recognition-frontend ./frontend
+   ```
+2. Запустите MinIO (локальный S3):
+   ```bash
+   docker run -d --name number-minio \
+     -p 9000:9000 -p 9001:9001 \
+     -e MINIO_ACCESS_KEY=minio -e MINIO_SECRET_KEY=minio123 \
+     -v $(pwd)/minio-data:/data \
+     quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z server /data --console-address ":9001"
+   ```
+3. Запустите backend со встроенной SQLite (файл будет сохранён в `backend/data`):
+   ```bash
+   mkdir -p backend/data
+   docker run -d --name number-backend --env-file .env \
+     -e DATABASE_URL=sqlite:////app/data/number_recognition.db \
+     -e S3_ENDPOINT=http://number-minio:9000 \
+     -e S3_ACCESS_KEY=minio -e S3_SECRET_KEY=minio123 -e S3_BUCKET=plates-events \
+     -p 8000:8000 \
+     -v $(pwd)/backend/data:/app/data \
+     --link number-minio \
+     number-recognition-backend
+   ```
+4. Запустите frontend, указывая URL API:
+   ```bash
+   docker run -d --name number-frontend -p 5173:80 \
+     -e VITE_API_BASE_URL=http://localhost:8000 \
+     number-recognition-frontend
    ```

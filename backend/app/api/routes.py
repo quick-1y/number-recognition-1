@@ -4,9 +4,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_db, require_role
 from app.core.config import get_settings
 from app.core.security import create_access_token, verify_password
-from app.api.deps import get_db, require_role
 from app.db.models import User, UserRole
 from app.events import alarm_relay_controller, event_manager, webhook_service
 from app.monitoring import base_operational_snapshot, metrics_registry
@@ -26,7 +26,6 @@ from app.pipeline import (
 )
 
 router = APIRouter()
-
 settings = get_settings()
 
 rules_engine = build_rules_engine(
@@ -206,10 +205,10 @@ def auth_me(current_user: User = Depends(require_role(UserRole.viewer))) -> User
 def register_channel(
     request: ChannelRequest,
     current_user: User = Depends(require_role(UserRole.operator, UserRole.admin)),
-    ) -> dict:
-        channel = ChannelConfig(
-            channel_id=request.channel_id,
-            name=request.name,
+) -> dict:
+    channel = ChannelConfig(
+        channel_id=request.channel_id,
+        name=request.name,
         source=request.source,
         protocol=request.protocol,
         target_fps=request.target_fps,

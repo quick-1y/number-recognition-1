@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_env: str = Field("development", validation_alias="APP_ENV")
-    database_url: str = Field(..., validation_alias="DATABASE_URL")
+    database_url: str = Field("sqlite:///./data/number_recognition.db", validation_alias="DATABASE_URL")
 
     s3_endpoint: str = Field(..., validation_alias="S3_ENDPOINT")
     s3_region: str | None = Field(None, validation_alias="S3_REGION")

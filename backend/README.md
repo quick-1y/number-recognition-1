@@ -20,11 +20,19 @@ source .venv/bin/activate
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-pip install -r requirements.txt
+   # Устанавливайте зависимости через интерпретатор, к которому привязано venv,
+   # чтобы избежать ошибки "ModuleNotFoundError: No module named 'pydantic_settings'"
+   # при запуске `uvicorn`.
+   pip install -r requirements.txt            # Linux/macOS
+   py -m pip install -r requirements.txt      # Windows (PowerShell)
 cp ../.env.example ../.env  # при необходимости обновите значения
 alembic upgrade head         # применить миграции (требуется доступ к БД из DATABASE_URL)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+> Если при запуске `uvicorn` появляется `ModuleNotFoundError: No module named 'pydantic_settings'`,
+> убедитесь, что зависимости установлены именно из виртуального окружения: выполните
+> `py -m pip install -r requirements.txt` в активированном PowerShell и затем повторите запуск.
 
 ### Работа с миграциями
 - Редактируйте модели в `app/db/models.py`.

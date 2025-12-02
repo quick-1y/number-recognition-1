@@ -40,7 +40,7 @@
 3. Установите зависимости для **backend**:
     ```bash
     cd backend
-    python -m venv .venv
+    py -m venv .venv
     source .venv/bin/activate  # Linux/macOS
     .\.venv\Scripts\Activate.ps1  # Windows (PowerShell)
     pip install -r requirements.txt

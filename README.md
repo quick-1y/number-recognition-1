@@ -28,7 +28,7 @@
 
 1. Клонируйте репозиторий:
     ```bash
-    git clone https://github.com/yourrepo/number-recognition.git
+    git clone https://github.com/quick-1y/number-recognition-1.git
     cd number-recognition
     ```
 
